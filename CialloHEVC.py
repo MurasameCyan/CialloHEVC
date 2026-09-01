@@ -35,13 +35,16 @@ for _std_stream in (sys.stdout, sys.stderr):
 
 # ==================== 版本号 ====================
 # 每次修改当前应用源码时，手动将版本号末位加一。
-APP_VERSION = "1.0.69"
+APP_VERSION = "1.0.70"
 
-# ↻ 递归开关放在输入行「浏览」按钮正上方的分组标题行留白里，不占用两行内部空间，
+# ↻ 递归开关与 🔗 同步开关并排放在分组标题行留白里，不占用两行内部空间，
 # 因此行距和按钮间距全部保持原样。数值以「工作目录」分组框左上角为原点：
-# 负 y 表示落在分组框上方的标题行内，x 相对容器右缘对齐浏览按钮水平中心。
+# 负 y 表示落在分组框上方的标题行内，x 为相对分组框右缘的偏移（anchor="e"，
+# 即偏移量直接就是按钮右边缘，不受圆角把实宽撑宽的影响）。
+# ↻ 右边缘对齐「浏览」按钮右边缘（-10 即两行尾部的 padx），🔗 紧贴其左侧。
 RECURSIVE_BTN_ABOVE_Y = -19
-RECURSIVE_BTN_RIGHT_OFFSET = -50
+RECURSIVE_BTN_RIGHT_OFFSET = -10
+SYNC_BTN_RIGHT_OFFSET = RECURSIVE_BTN_RIGHT_OFFSET - 38 - 5
 
 GITHUB_FFMPEG_API_URL = "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest"
 GITHUB_FFMPEG_RELEASE_URL = "https://github.com/GyanD/codexffmpeg/releases/latest"
@@ -1958,8 +1961,10 @@ class ConverterGUI(ctk.CTk):
             corner_radius=8)
         self.output_browse_btn.pack(side="left", padx=(0, 10))
 
+        # 🔗 / ↻ 两个开关并排放在分组框上方的标题行留白里：真实父级是外层 frame，
+        # 否则分组框会把负 y 裁掉；定位用 in_=parent 相对分组框，与窗口宽度无关。
         self.sync_btn = ctk.CTkButton(
-            container, text="🔗",
+            parent.master, text="🔗",
             command=self.toggle_input_output_sync,
             width=38, height=22,
             fg_color="transparent",
@@ -1968,7 +1973,11 @@ class ConverterGUI(ctk.CTk):
             corner_radius=11,
             border_spacing=0,
             font=("Segoe UI Emoji", 10))
-        self.sync_btn.place(x=25, y=40, anchor="center")
+        self.sync_btn.place(
+            in_=parent, relx=1.0, rely=0.0,
+            x=SYNC_BTN_RIGHT_OFFSET,
+            y=RECURSIVE_BTN_ABOVE_Y,
+            anchor="e")
         self.create_tooltip(self.sync_btn, "开启后输出目录始终等于输入目录")
 
         # ↻ 递归子目录开关
@@ -1987,7 +1996,7 @@ class ConverterGUI(ctk.CTk):
             in_=parent, relx=1.0, rely=0.0,
             x=RECURSIVE_BTN_RIGHT_OFFSET,
             y=RECURSIVE_BTN_ABOVE_Y,
-            anchor="center")
+            anchor="e")
         self.create_tooltip(self.recursive_btn, "递归扫描子目录")
         self._apply_recursive_state()
 

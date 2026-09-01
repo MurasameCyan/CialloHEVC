@@ -95,7 +95,17 @@ class TestRecursiveButton(unittest.TestCase):
         self.assertEqual(float(info['relx']), 1.0)
         self.assertEqual(int(info['x']), CialloHEVC.RECURSIVE_BTN_RIGHT_OFFSET)
         self.assertEqual(int(info['y']), CialloHEVC.RECURSIVE_BTN_ABOVE_Y)
-        self.assertEqual(info['anchor'], 'center')
+        self.assertEqual(info['anchor'], 'e')
+
+    def test_sync_button_shares_recursive_row(self):
+        """🔗 与 ↻ 同行同锚点，只差 X 偏移"""
+        sync = self.gui.sync_btn.place_info()
+        rec = self.gui.recursive_btn.place_info()
+        self.assertEqual(sync['in'], rec['in'])
+        self.assertEqual(int(sync['y']), int(rec['y']))
+        self.assertEqual(sync['anchor'], rec['anchor'])
+        self.assertEqual(int(sync['x']), CialloHEVC.SYNC_BTN_RIGHT_OFFSET)
+        self.assertLess(int(sync['x']), int(rec['x']), "🔗 必须在 ↻ 左侧")
 
     def _realize(self):
         """place/pack 的实际几何要等窗口真正布局后才可读"""
@@ -121,33 +131,45 @@ class TestRecursiveButton(unittest.TestCase):
         self.assertGreaterEqual(left, 0)
         self.assertLessEqual(right, container_width)
 
-    def test_recursive_button_centered_above_input_browse(self):
-        """按钮必须与输入行「浏览」水平居中对齐，且完全落在它上方"""
+    def test_recursive_button_right_aligned_above_input_browse(self):
+        """递归按钮右边缘对齐输入行「浏览」右边缘，且完全落在它上方"""
         self._realize()
         r, b = self.gui.recursive_btn, self.gui.input_browse_btn
         self.assertGreater(r.winfo_width(), 1, "按钮未完成布局，几何断言无意义")
         self.assertEqual(
-            r.winfo_rootx() + r.winfo_width() // 2,
-            b.winfo_rootx() + b.winfo_width() // 2,
-            "递归按钮未与输入行「浏览」按钮水平居中对齐",
+            r.winfo_rootx() + r.winfo_width(),
+            b.winfo_rootx() + b.winfo_width(),
+            "递归按钮右边缘未与输入行「浏览」按钮右边缘对齐",
         )
         self.assertLessEqual(
             r.winfo_rooty() + r.winfo_height(), b.winfo_rooty(),
             "递归按钮未完全位于「浏览」按钮上方",
         )
 
-    def test_recursive_button_does_not_overlap_rows(self):
-        """按钮落在分组框上方留白里，不得压住任一输入输出控件"""
+    def test_sync_button_sits_left_of_recursive_without_touching(self):
+        """🔗 在 ↻ 左侧同一行，两者不得重叠"""
         self._realize()
-        r = self.gui.recursive_btn
-        r_top, r_bottom = r.winfo_rooty(), r.winfo_rooty() + r.winfo_height()
-        for name in ('input_entry', 'input_browse_btn', 'output_entry',
-                     'output_paste_btn', 'output_browse_btn'):
-            w = getattr(self.gui, name)
-            self.assertLessEqual(
-                r_bottom, w.winfo_rooty(),
-                f"递归按钮 {r_top}..{r_bottom} 与 {name} 垂直重叠，会劫持它的点击",
-            )
+        s, r = self.gui.sync_btn, self.gui.recursive_btn
+        self.assertGreater(s.winfo_width(), 1, "按钮未完成布局，几何断言无意义")
+        self.assertEqual(s.winfo_rooty(), r.winfo_rooty(), "🔗 与 ↻ 不在同一行")
+        self.assertLessEqual(
+            s.winfo_rootx() + s.winfo_width(), r.winfo_rootx(),
+            "🔗 与 ↻ 水平重叠，会劫持点击",
+        )
+
+    def test_switch_buttons_do_not_overlap_rows(self):
+        """两个开关落在分组框上方留白里，不得压住任一输入输出控件"""
+        self._realize()
+        for btn_name in ('recursive_btn', 'sync_btn'):
+            r = getattr(self.gui, btn_name)
+            r_top, r_bottom = r.winfo_rooty(), r.winfo_rooty() + r.winfo_height()
+            for name in ('input_entry', 'input_browse_btn', 'output_entry',
+                         'output_paste_btn', 'output_browse_btn'):
+                w = getattr(self.gui, name)
+                self.assertLessEqual(
+                    r_bottom, w.winfo_rooty(),
+                    f"{btn_name} {r_top}..{r_bottom} 与 {name} 垂直重叠，会劫持它的点击",
+                )
 
     def test_recursive_button_initial_state(self):
         """递归按钮初始关闭：透明背景、灰色图标"""

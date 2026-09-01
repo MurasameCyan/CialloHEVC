@@ -298,8 +298,9 @@ class DirectorySyncControlTests(unittest.TestCase):
         self.assertNotIn('text="输入=输出"', source)
         self.assertNotIn("sync_row", source)
         self.assertNotIn("self.sync_switch", source)
-        self.assertIn('self.sync_btn.place(x=25, y=40, anchor="center")', source)
         self.assertNotIn("link_btn", source)
+        # 实际落位由 test_multi_directory_input 的活体几何断言把关，这里只查它不再挂在 container 上
+        self.assertIn("x=SYNC_BTN_RIGHT_OFFSET", source)
 
 
 if __name__ == "__main__":
