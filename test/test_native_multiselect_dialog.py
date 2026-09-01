@@ -96,6 +96,15 @@ class TestBrowseInputDirUsesNativePicker(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
         patch_config_path(self, os.path.join(self.temp_dir, 'config.json'))
+        # 走原生路径的用例一律先禁掉 Tk 单选框：一旦实现退化成「压根没调原生框」，
+        # 这里立刻断言失败，而不是弹出真模态框把无头测试挂死。上一次回归就是这么
+        # 漏过去的——挂死看起来像「跑得慢」，不像失败。故意测回退循环的用例自己
+        # 再 patch 一层盖掉它即可（内层 patch 退出时会还原成这个哨兵）。
+        guard = mock.patch.object(
+            CialloHEVC.filedialog, 'askdirectory',
+            side_effect=AssertionError('不该弹 Tk 单选框：原生多选框才是主路径'))
+        guard.start()
+        self.addCleanup(guard.stop)
         self.gui = ConverterGUI()
         self.gui.withdraw()
 

@@ -35,7 +35,7 @@ for _std_stream in (sys.stdout, sys.stderr):
 
 # ==================== 版本号 ====================
 # 每次修改当前应用源码时，手动将版本号末位加一。
-APP_VERSION = "1.0.71"
+APP_VERSION = "1.0.72"
 
 # ↻ 递归开关与 🔗 同步开关并排放在分组标题行留白里，不占用两行内部空间，
 # 因此行距和按钮间距全部保持原样。数值以「工作目录」分组框左上角为原点：
@@ -3126,9 +3126,13 @@ class ConverterGUI(ctk.CTk):
         except Exception:
             hwnd = 0
         try:
-            raise OSError('mut'); picked = pick_directories_native(
+            picked = pick_directories_native(
                 initial, "选择输入目录（可按住 Ctrl / Shift 多选）", hwnd)
-        except Exception:
+        except Exception as e:
+            # 不要静默回退：原生框失败时把原因写进日志面板，否则界面上只会看到
+            # 单选循环框，完全无法区分「系统不支持」和「代码写错了」。
+            # 用 self.log 而不是 print：exe 是 --noconsole 打包，print 看不见。
+            self.log(f"原生多选文件夹对话框不可用，已回退为逐个选择：{e!r}")
             picked = self._browse_input_dirs_loop(initial)
 
         if picked:
