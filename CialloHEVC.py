@@ -35,7 +35,7 @@ for _std_stream in (sys.stdout, sys.stderr):
 
 # ==================== 版本号 ====================
 # 每次修改当前应用源码时，手动将版本号末位加一。
-APP_VERSION = "1.0.72"
+APP_VERSION = "1.0.73"
 
 # ↻ 递归开关与 🔗 同步开关并排放在分组标题行留白里，不占用两行内部空间，
 # 因此行距和按钮间距全部保持原样。数值以「工作目录」分组框左上角为原点：
@@ -2133,7 +2133,7 @@ class ConverterGUI(ctk.CTk):
             x=SYNC_BTN_RIGHT_OFFSET,
             y=RECURSIVE_BTN_ABOVE_Y,
             anchor="e")
-        self.create_tooltip(self.sync_btn, "开启后输出目录始终等于输入目录")
+        self.create_tooltip(self.sync_btn, "开启后输出跟随输入：每个文件输出到自己的源目录")
 
         # ↻ 递归子目录开关
         self.recursive_enabled = self.config.recursive_subdirs
@@ -3061,14 +3061,29 @@ class ConverterGUI(ctk.CTk):
         entry.configure(border_color=self._dir_border_color if usable else ("#F44336", "#EF5350"))
 
     def sync_output_to_input(self, *_):
-        """同步开启时，让输出目录持续跟随输入目录。"""
+        """同步开启时，让输出目录持续跟随输入目录。
+
+        多目录时整串照抄：🔗 开启后每个文件都输出到自己的源目录
+        （见 Converter._determine_output_dir），输出框只显示第一个目录会让人
+        误以为所有文件都挤进那一个目录里。整串分号路径不是合法目录，需要单个
+        目录的地方统一走 resolve_output_dir()。
+        """
         if not self.sync_dirs_var.get():
             return
-        # 多目录时输出框只显示第一个：整串分号路径不是合法目录
         paths = self.split_dir_paths(self.input_dir_var.get())
         if paths:
-            self.output_dir_var.set(os.path.normpath(paths[0]))
+            self.output_dir_var.set(';'.join(os.path.normpath(p) for p in paths))
             self.scroll_entry_to_end(self.output_entry)
+
+    def resolve_output_dir(self):
+        """把输出框的内容归一成单个目录：多段时取第一段。
+
+        🔗 开启时输出框是照抄输入的整串分号路径，不能直接 makedirs。每个文件
+        的真实输出目录由 Converter._determine_output_dir 按源文件决定，这里
+        返回的值只用来放汇总日志和临时日志。
+        """
+        dirs = self.split_dir_paths(self.output_dir_var.get())
+        return dirs[0] if dirs else ''
 
     def _apply_sync_dirs_state(self):
         """按当前同步状态刷新按钮配色、输出控件可用性，并做一次同步。
@@ -3228,7 +3243,8 @@ class ConverterGUI(ctk.CTk):
             self.config.target_ssim = float(self.ssim_var.get() or 0.95)
             self.config.preset = self.preset_var.get()
             self.config.input_paths = self.split_dir_paths(self.input_dir_var.get())
-            self.config.output_dir = self.output_dir_var.get()
+            # 🔗 开启时输出框是整串分号路径，配置里只存单个目录
+            self.config.output_dir = self.resolve_output_dir()
             self.config.ffmpeg_path = self.ffmpeg_path_var.get()
             self.config.proxy_url = self.proxy_url_var.get()
             self.config.out_format = self.out_format_var.get()
@@ -3569,7 +3585,7 @@ class ConverterGUI(ctk.CTk):
     
     def start_conversion(self):
         input_paths = self.split_dir_paths(self.input_dir_var.get())
-        output_dir = self.output_dir_var.get().strip()
+        output_dir = self.resolve_output_dir()
 
         if not input_paths:
             self.show_dialog("错误: 输入目录不能为空", "", dialog_type="error")

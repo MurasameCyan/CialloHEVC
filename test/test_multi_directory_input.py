@@ -300,11 +300,34 @@ class TestMultiDirectoryBrowse(unittest.TestCase):
         self.addCleanup(gui2.destroy)
         self.assertEqual(gui2.input_dir_var.get(), ';'.join(self.dirs))
 
-    def test_sync_uses_first_path_when_multiple_selected(self):
-        """🔗 开启时输出框不能显示整串分号路径"""
+    def test_sync_mirrors_all_input_paths(self):
+        """🔗 开启时输出框要照抄全部输入目录
+
+        每个文件输出到自己的源目录，输出框只显示第一个会让人误以为
+        所有文件都挤进那一个目录。
+        """
         self.gui.sync_dirs_var.set(True)
         self.gui.input_dir_var.set(';'.join(self.dirs))
-        self.assertEqual(self.gui.output_dir_var.get(), os.path.normpath(self.dirs[0]))
+        self.assertEqual(
+            self.gui.output_dir_var.get(),
+            ';'.join(os.path.normpath(d) for d in self.dirs))
+
+    def test_resolve_output_dir_takes_first_segment(self):
+        """整串分号路径不能直接 makedirs：需要单个目录的地方取第一段"""
+        self.gui.output_dir_var.set(';'.join(self.dirs))
+        self.assertEqual(
+            self.gui.resolve_output_dir(), os.path.normpath(self.dirs[0]))
+
+    def test_resolve_output_dir_empty_stays_empty(self):
+        """空输出框仍要判定为空，否则「输出目录不能为空」的拦截会失效"""
+        self.gui.output_dir_var.set('   ')
+        self.assertEqual(self.gui.resolve_output_dir(), '')
+
+    def test_start_conversion_normalizes_output_dir(self):
+        """start_conversion 必须走 resolve_output_dir，不能直接读输出框原文"""
+        src = inspect.getsource(CialloHEVC.ConverterGUI.start_conversion)
+        self.assertIn('self.resolve_output_dir()', src)
+        self.assertNotIn('self.output_dir_var.get().strip()', src)
 
 
 class TestSaveConfigPersistsInput(unittest.TestCase):
@@ -331,6 +354,14 @@ class TestSaveConfigPersistsInput(unittest.TestCase):
         self.gui.input_dir_var.set(';'.join(self.dirs))
         self.gui.save_config()
         self.assertEqual(self.gui.config.input_paths, self.dirs)
+
+    def test_save_config_stores_single_output_dir_when_synced(self):
+        """🔗 开启时输出框是整串分号路径，配置里不能原样存进去"""
+        self.gui.sync_dirs_var.set(True)
+        self.gui.input_dir_var.set(';'.join(self.dirs))
+        self.gui.save_config()
+        self.assertEqual(
+            self.gui.config.output_dir, os.path.normpath(self.dirs[0]))
 
     def test_save_config_round_trips_input_paths_to_disk(self):
         """存盘后重新加载仍在，否则重启就丢了"""
