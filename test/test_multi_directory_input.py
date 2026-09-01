@@ -90,27 +90,27 @@ class TestRecursiveButton(unittest.TestCase):
     def test_recursive_button_position(self):
         """递归按钮位置在输入输出行之间、右侧"""
         info = self.gui.recursive_btn.place_info()
-        self.assertEqual(int(info['x']), 625)  # 与浏览粘贴按钮对齐
+        self.assertEqual(int(info['x']), 705)  # 输出浏览按钮右边界 700 之后，避免遮挡
         self.assertEqual(int(info['y']), 40)   # 输入10，输出55，中间40
 
     def test_recursive_button_initial_state(self):
         """递归按钮初始关闭：透明背景、灰色图标"""
         self.assertEqual(self.gui.recursive_enabled, False)
         self.assertEqual(self.gui.recursive_btn.cget('fg_color'), 'transparent')
-        self.assertEqual(self.gui.recursive_btn.cget('text_color'), 'gray')
+        self.assertEqual(self.gui.recursive_btn.cget('text_color'), ("gray40", "gray75"))
 
     def test_toggle_recursive_changes_state(self):
         """点击递归按钮切换状态和配色"""
         self.gui.toggle_recursive()
         self.assertTrue(self.gui.recursive_enabled)
-        self.assertEqual(self.gui.recursive_btn.cget('fg_color'), '#1f6aa5')
+        self.assertEqual(self.gui.recursive_btn.cget('fg_color'), ("#2196F3", "#1976D2"))
         self.assertEqual(self.gui.recursive_btn.cget('text_color'), 'white')
         self.assertTrue(self.gui.config.recursive_subdirs)
 
         self.gui.toggle_recursive()
         self.assertFalse(self.gui.recursive_enabled)
         self.assertEqual(self.gui.recursive_btn.cget('fg_color'), 'transparent')
-        self.assertEqual(self.gui.recursive_btn.cget('text_color'), 'gray')
+        self.assertEqual(self.gui.recursive_btn.cget('text_color'), ("gray40", "gray75"))
         self.assertFalse(self.gui.config.recursive_subdirs)
 
     def test_recursive_state_restores_from_config(self):
@@ -123,7 +123,7 @@ class TestRecursiveButton(unittest.TestCase):
         self.addCleanup(gui2.destroy)
 
         self.assertTrue(gui2.recursive_enabled)
-        self.assertEqual(gui2.recursive_btn.cget('fg_color'), '#1f6aa5')
+        self.assertEqual(gui2.recursive_btn.cget('fg_color'), ("#2196F3", "#1976D2"))
         self.assertEqual(gui2.recursive_btn.cget('text_color'), 'white')
 
 

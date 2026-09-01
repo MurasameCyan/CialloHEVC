@@ -1935,12 +1935,12 @@ class ConverterGUI(ctk.CTk):
             command=self.toggle_recursive,
             width=38, height=38,
             fg_color="transparent",
-            hover=False,
-            text_color="gray",
+            hover_color=("gray78", "gray28"),
+            text_color=("gray40", "gray75"),
             corner_radius=999,
             border_spacing=0,
             font=("Segoe UI", 16))
-        self.recursive_btn.place(x=625, y=40)
+        self.recursive_btn.place(x=705, y=40)
         self.create_tooltip(self.recursive_btn, "递归扫描子目录")
         self._apply_recursive_state()
 
@@ -2881,9 +2881,9 @@ class ConverterGUI(ctk.CTk):
     def _apply_recursive_state(self):
         """应用递归开关状态（颜色+tooltip）"""
         if self.recursive_enabled:
-            self.recursive_btn.configure(fg_color='#1f6aa5', text_color='white')
+            self.recursive_btn.configure(fg_color=("#2196F3", "#1976D2"), text_color="white")
         else:
-            self.recursive_btn.configure(fg_color='transparent', text_color='gray')
+            self.recursive_btn.configure(fg_color="transparent", text_color=("gray40", "gray75"))
 
     def browse_input_dir(self):
         d = filedialog.askdirectory(initialdir=self.input_dir_var.get(), title="选择输入目录")
@@ -2965,7 +2965,6 @@ class ConverterGUI(ctk.CTk):
             self.config.crf = int(self.crf_var.get() or 18)
             self.config.target_ssim = float(self.ssim_var.get() or 0.95)
             self.config.preset = self.preset_var.get()
-            self.config.input_dir = self.input_dir_var.get()
             self.config.output_dir = self.output_dir_var.get()
             self.config.ffmpeg_path = self.ffmpeg_path_var.get()
             self.config.proxy_url = self.proxy_url_var.get()
@@ -3341,7 +3340,6 @@ class ConverterGUI(ctk.CTk):
             return
 
         # 记住本次实际使用的目录，重启后不再退回上次"保存配置"时的路径
-        self.config.input_dir = input_dir
         self.config.output_dir = output_dir
         try:
             self.config.save()
