@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# PyInstaller 构建产物
+build/
+dist/
+*.exe
+*.zip
+
+# 本地配置与运行记录（含本机绝对路径）
+config.json
+history.json
+log/
+
+# FFmpeg 本体，请自行下载
+Core/
+
+# 历史版本快照与本地素材
+out/
+1/
+CialloHEVC - v*.py
+todo.txt
+
+# 图标源图（仅保留打包所需的 icon.ico）
+icon.png
+
+# 测试素材与临时文件
+test/*.wmv
+test/*.mp4
+test/*.mkv
+test/Untitled-*.ini
+test/errinfo.txt
+test/index.html
+
+# AI 工作文档
+docs/superpowers/
