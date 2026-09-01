@@ -70,6 +70,15 @@ class TestConfigMigration(unittest.TestCase):
         self.assertTrue(data['recursive_subdirs'])
 
 
+# 下面这几条几何断言要读真实窗口坐标，得先 deiconify + 跑几轮 mainloop（见
+# _realize）。GitHub Actions 的 Windows runner 没有交互式桌面，跑完一次 _realize
+# 再构造下一个 ConverterGUI 就会永久卡住，整个 job 只能耗到超时——CI 日志停在
+# test_recursive_button_not_clipped 之后再无输出。这些断言只在本地有意义，CI 上
+# 跳过；CI 变量由 Actions 自动注入。
+NEEDS_REAL_WINDOW = unittest.skipIf(
+    os.environ.get('CI') == 'true', '需要真实窗口布局，CI runner 无交互式桌面')
+
+
 class TestRecursiveButton(unittest.TestCase):
     def setUp(self):
         # GUI 内部自建 Config，必须先改路径再构造，避免读写仓库真实 config.json
@@ -122,6 +131,7 @@ class TestRecursiveButton(unittest.TestCase):
         left = widget.winfo_rootx() - origin
         return left, left + widget.winfo_width()
 
+    @NEEDS_REAL_WINDOW
     def test_recursive_button_not_clipped(self):
         """按钮实宽会被圆角撑宽，必须完整落在容器内，否则图标不可见"""
         self._realize()
@@ -131,6 +141,7 @@ class TestRecursiveButton(unittest.TestCase):
         self.assertGreaterEqual(left, 0)
         self.assertLessEqual(right, container_width)
 
+    @NEEDS_REAL_WINDOW
     def test_recursive_button_right_aligned_above_input_browse(self):
         """递归按钮右边缘对齐输入行「浏览」右边缘，且完全落在它上方"""
         self._realize()
@@ -146,6 +157,7 @@ class TestRecursiveButton(unittest.TestCase):
             "递归按钮未完全位于「浏览」按钮上方",
         )
 
+    @NEEDS_REAL_WINDOW
     def test_sync_button_sits_left_of_recursive_without_touching(self):
         """🔗 在 ↻ 左侧同一行，两者不得重叠"""
         self._realize()
@@ -157,6 +169,7 @@ class TestRecursiveButton(unittest.TestCase):
             "🔗 与 ↻ 水平重叠，会劫持点击",
         )
 
+    @NEEDS_REAL_WINDOW
     def test_switch_buttons_do_not_overlap_rows(self):
         """两个开关落在分组框上方留白里，不得压住任一输入输出控件"""
         self._realize()
