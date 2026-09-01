@@ -39,7 +39,7 @@ APP_VERSION = "1.0.66"
 
 # ↻ 递归开关放在两行「浏览」按钮右侧的留白里。corner_radius=999 会把 38px 的按钮
 # 撑到 55px 实宽，留白必须按实宽预留，否则按钮会溢出容器被裁掉。
-RECURSIVE_BTN_GUTTER = 55
+RECURSIVE_BTN_GAP = 48
 
 GITHUB_FFMPEG_API_URL = "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest"
 GITHUB_FFMPEG_RELEASE_URL = "https://github.com/GyanD/codexffmpeg/releases/latest"
@@ -1868,7 +1868,7 @@ class ConverterGUI(ctk.CTk):
         ctk.CTkLabel(input_row, text="输入:", font=("Segoe UI", 12), width=50).pack(side="left", padx=(0, 5))
         
         input_field = ctk.CTkFrame(input_row, fg_color="transparent")
-        input_field.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        input_field.pack(side="left", fill="x", expand=True, padx=(0, RECURSIVE_BTN_GAP))
 
         self.input_entry = ctk.CTkEntry(input_field, textvariable=self.input_dir_var, height=35)
         self.input_entry.pack(side="left", fill="x", expand=True)
@@ -1887,7 +1887,7 @@ class ConverterGUI(ctk.CTk):
         ctk.CTkButton(input_row, text="浏览", command=self.browse_input_dir, width=80, height=35,
                      fg_color=("#9C27B0", "#7B1FA2"),
                      hover_color=("#7B1FA2", "#6A1B9A"),
-                     corner_radius=8).pack(side="left", padx=(0, RECURSIVE_BTN_GUTTER))
+                     corner_radius=8).pack(side="left", padx=(0, 10))
 
         # 第二行：输出目录
         output_row = ctk.CTkFrame(container, fg_color="transparent")
@@ -1896,7 +1896,7 @@ class ConverterGUI(ctk.CTk):
         ctk.CTkLabel(output_row, text="输出:", font=("Segoe UI", 12), width=50).pack(side="left", padx=(0, 5))
         
         output_field = ctk.CTkFrame(output_row, fg_color="transparent")
-        output_field.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        output_field.pack(side="left", fill="x", expand=True, padx=(0, RECURSIVE_BTN_GAP))
 
         self.output_entry = ctk.CTkEntry(output_field, textvariable=self.output_dir_var, height=35)
         self.output_entry.pack(side="left", fill="x", expand=True)
@@ -1917,7 +1917,7 @@ class ConverterGUI(ctk.CTk):
             fg_color=("#9C27B0", "#7B1FA2"),
             hover_color=("#7B1FA2", "#6A1B9A"),
             corner_radius=8)
-        self.output_browse_btn.pack(side="left", padx=(0, RECURSIVE_BTN_GUTTER))
+        self.output_browse_btn.pack(side="left", padx=(0, 10))
 
         self.sync_btn = ctk.CTkButton(
             container, text="🔗",
@@ -1937,14 +1937,14 @@ class ConverterGUI(ctk.CTk):
         self.recursive_btn = ctk.CTkButton(
             container, text="↻",
             command=self.toggle_recursive,
-            width=38, height=38,
+            width=38, height=22,
             fg_color="transparent",
             hover_color=("gray78", "gray28"),
             text_color=("gray40", "gray75"),
-            corner_radius=999,
+            corner_radius=11,
             border_spacing=0,
-            font=("Segoe UI", 16))
-        self.recursive_btn.place(relx=1.0, x=-RECURSIVE_BTN_GUTTER, y=40)
+            font=("Segoe UI", 14))
+        self.recursive_btn.place(relx=1.0, x=-114, y=40, anchor="center")
         self.create_tooltip(self.recursive_btn, "递归扫描子目录")
         self._apply_recursive_state()
 

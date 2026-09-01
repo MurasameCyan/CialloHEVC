@@ -91,8 +91,9 @@ class TestRecursiveButton(unittest.TestCase):
         """递归按钮贴容器右缘、位于输入输出行之间"""
         info = self.gui.recursive_btn.place_info()
         self.assertEqual(float(info['relx']), 1.0)
-        self.assertEqual(int(info['x']), -55)  # 圆角撑宽后的实宽，靠右回退一个按钮位
-        self.assertEqual(int(info['y']), 40)   # 输入10，输出55，中间40
+        self.assertEqual(int(info['x']), -114)  # 落在 📋 与「浏览」之间的空隙
+        self.assertEqual(int(info['y']), 40)    # 输入10，输出55，中间40
+        self.assertEqual(info['anchor'], 'center')
 
     def _realize(self):
         """place/pack 的实际几何要等窗口真正布局后才可读"""
@@ -118,14 +119,16 @@ class TestRecursiveButton(unittest.TestCase):
         self.assertGreaterEqual(left, 0)
         self.assertLessEqual(right, container_width)
 
-    def test_recursive_button_does_not_cover_browse(self):
-        """按钮后置于两行之上，与输出浏览按钮重叠会劫持它的点击"""
+    def test_recursive_button_sits_in_gap_between_paste_and_browse(self):
+        """按钮后置于两行之上，压住任一按钮都会劫持它的点击"""
         self._realize()
         r_left, r_right = self._span(self.gui.recursive_btn)
+        p_left, p_right = self._span(self.gui.output_paste_btn)
         b_left, b_right = self._span(self.gui.output_browse_btn)
         self.assertTrue(
-            r_right <= b_left or r_left >= b_right,
-            f"递归按钮 {r_left}..{r_right} 与输出浏览按钮 {b_left}..{b_right} 重叠",
+            r_left >= p_right and r_right <= b_left,
+            f"递归按钮 {r_left}..{r_right} 未落在 📋 {p_left}..{p_right} "
+            f"与浏览 {b_left}..{b_right} 之间的空隙内",
         )
 
     def test_recursive_button_initial_state(self):
