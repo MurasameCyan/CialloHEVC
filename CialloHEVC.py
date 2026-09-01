@@ -37,6 +37,10 @@ for _std_stream in (sys.stdout, sys.stderr):
 # 每次修改当前应用源码时，手动将版本号末位加一。
 APP_VERSION = "1.0.66"
 
+# ↻ 递归开关放在两行「浏览」按钮右侧的留白里。corner_radius=999 会把 38px 的按钮
+# 撑到 55px 实宽，留白必须按实宽预留，否则按钮会溢出容器被裁掉。
+RECURSIVE_BTN_GUTTER = 55
+
 GITHUB_FFMPEG_API_URL = "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest"
 GITHUB_FFMPEG_RELEASE_URL = "https://github.com/GyanD/codexffmpeg/releases/latest"
 DOWNLOAD_USER_AGENT = "CialloHEVC"
@@ -1883,7 +1887,7 @@ class ConverterGUI(ctk.CTk):
         ctk.CTkButton(input_row, text="浏览", command=self.browse_input_dir, width=80, height=35,
                      fg_color=("#9C27B0", "#7B1FA2"),
                      hover_color=("#7B1FA2", "#6A1B9A"),
-                     corner_radius=8).pack(side="left", padx=(0, 10))
+                     corner_radius=8).pack(side="left", padx=(0, RECURSIVE_BTN_GUTTER))
 
         # 第二行：输出目录
         output_row = ctk.CTkFrame(container, fg_color="transparent")
@@ -1913,7 +1917,7 @@ class ConverterGUI(ctk.CTk):
             fg_color=("#9C27B0", "#7B1FA2"),
             hover_color=("#7B1FA2", "#6A1B9A"),
             corner_radius=8)
-        self.output_browse_btn.pack(side="left", padx=(0, 10))
+        self.output_browse_btn.pack(side="left", padx=(0, RECURSIVE_BTN_GUTTER))
 
         self.sync_btn = ctk.CTkButton(
             container, text="🔗",
@@ -1940,7 +1944,7 @@ class ConverterGUI(ctk.CTk):
             corner_radius=999,
             border_spacing=0,
             font=("Segoe UI", 16))
-        self.recursive_btn.place(x=705, y=40)
+        self.recursive_btn.place(relx=1.0, x=-RECURSIVE_BTN_GUTTER, y=40)
         self.create_tooltip(self.recursive_btn, "递归扫描子目录")
         self._apply_recursive_state()
 

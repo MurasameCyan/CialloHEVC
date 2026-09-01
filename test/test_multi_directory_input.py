@@ -88,10 +88,45 @@ class TestRecursiveButton(unittest.TestCase):
         self.assertIsInstance(self.gui.recursive_btn, ctk.CTkButton)
 
     def test_recursive_button_position(self):
-        """递归按钮位置在输入输出行之间、右侧"""
+        """递归按钮贴容器右缘、位于输入输出行之间"""
         info = self.gui.recursive_btn.place_info()
-        self.assertEqual(int(info['x']), 705)  # 输出浏览按钮右边界 700 之后，避免遮挡
+        self.assertEqual(float(info['relx']), 1.0)
+        self.assertEqual(int(info['x']), -55)  # 圆角撑宽后的实宽，靠右回退一个按钮位
         self.assertEqual(int(info['y']), 40)   # 输入10，输出55，中间40
+
+    def _realize(self):
+        """place/pack 的实际几何要等窗口真正布局后才可读"""
+        self.gui.deiconify()
+        self.gui.update()
+        for _ in range(6):
+            self.gui.after(50, self.gui.quit)
+            self.gui.mainloop()
+            self.gui.update()
+        self.gui.withdraw()
+
+    def _span(self, widget):
+        origin = self.gui.recursive_btn.master.winfo_rootx()
+        left = widget.winfo_rootx() - origin
+        return left, left + widget.winfo_width()
+
+    def test_recursive_button_not_clipped(self):
+        """按钮实宽（圆角撑宽到 55）必须完整落在容器内，否则图标不可见"""
+        self._realize()
+        container_width = self.gui.recursive_btn.master.winfo_width()
+        left, right = self._span(self.gui.recursive_btn)
+        self.assertGreater(container_width, 1, "容器未完成布局，几何断言无意义")
+        self.assertGreaterEqual(left, 0)
+        self.assertLessEqual(right, container_width)
+
+    def test_recursive_button_does_not_cover_browse(self):
+        """按钮后置于两行之上，与输出浏览按钮重叠会劫持它的点击"""
+        self._realize()
+        r_left, r_right = self._span(self.gui.recursive_btn)
+        b_left, b_right = self._span(self.gui.output_browse_btn)
+        self.assertTrue(
+            r_right <= b_left or r_left >= b_right,
+            f"递归按钮 {r_left}..{r_right} 与输出浏览按钮 {b_left}..{b_right} 重叠",
+        )
 
     def test_recursive_button_initial_state(self):
         """递归按钮初始关闭：透明背景、灰色图标"""
