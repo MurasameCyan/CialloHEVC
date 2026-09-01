@@ -427,9 +427,7 @@ class Config:
         try:
             cfg = self._config_path()
             with open(cfg, 'w', encoding='utf-8') as f:
-                # 排除内部方法，只保存配置字段
-                data = {k: v for k, v in self.__dict__.items() if not k.startswith('_') and not callable(v)}
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                json.dump({k: v for k, v in self.__dict__.items()}, f, indent=2, ensure_ascii=False)
         except: pass
 
 

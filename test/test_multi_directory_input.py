@@ -32,20 +32,28 @@ class TestConfigMigration(unittest.TestCase):
             json.dump({'input_dir': r'D:\test', 'output_dir': r'D:\out'}, f)
 
         cfg = Config()
-        cfg._config_path = lambda: cfg_file
-        cfg.load()
-
-        self.assertEqual(cfg.input_paths, [r'D:\test'])
-        self.assertFalse(hasattr(cfg, 'input_dir'))
+        original_method = Config._config_path
+        try:
+            Config._config_path = staticmethod(lambda: cfg_file)
+            cfg.load()
+            self.assertEqual(cfg.input_paths, [r'D:\test'])
+            self.assertFalse(hasattr(cfg, 'input_dir'))
+        finally:
+            Config._config_path = original_method
 
     def test_config_save_includes_new_fields(self):
         """保存配置应包含 input_paths 和 recursive_subdirs"""
         cfg_file = os.path.join(self.temp_dir, 'config.json')
         cfg = Config()
-        cfg._config_path = lambda: cfg_file
         cfg.input_paths = [r'D:\a', r'D:\b']
         cfg.recursive_subdirs = True
-        cfg.save()
+
+        original_method = Config._config_path
+        try:
+            Config._config_path = staticmethod(lambda: cfg_file)
+            cfg.save()
+        finally:
+            Config._config_path = original_method
 
         with open(cfg_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
