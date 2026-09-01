@@ -278,6 +278,46 @@ class TestMultiDirectoryBrowse(unittest.TestCase):
         self.assertEqual(self.gui.output_dir_var.get(), os.path.normpath(self.dirs[0]))
 
 
+class TestSaveConfigPersistsInput(unittest.TestCase):
+    """「保存配置」要把输入目录列表写进 config，迁移到 input_paths 时漏了这处。"""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.cfg_file = os.path.join(self.temp_dir, 'config.json')
+        patch_config_path(self, self.cfg_file)
+        self.gui = ConverterGUI()
+        self.gui.withdraw()
+        # show_dialog 里 wait_window() 会等人点按钮，无头跑必须挡掉
+        self.gui.show_dialog = lambda *a, **k: None
+        self.dirs = [os.path.join(self.temp_dir, n) for n in ('one', 'two')]
+        for d in self.dirs:
+            os.makedirs(d)
+
+    def tearDown(self):
+        self.gui.destroy()
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_save_config_writes_input_paths(self):
+        self.gui.input_dir_var.set(';'.join(self.dirs))
+        self.gui.save_config()
+        self.assertEqual(self.gui.config.input_paths, self.dirs)
+
+    def test_save_config_round_trips_input_paths_to_disk(self):
+        """存盘后重新加载仍在，否则重启就丢了"""
+        self.gui.input_dir_var.set(';'.join(self.dirs))
+        self.gui.save_config()
+        with open(self.cfg_file, encoding='utf-8') as f:
+            self.assertEqual(json.load(f)['input_paths'], self.dirs)
+
+    def test_save_config_does_not_persist_stale_input_dir_key(self):
+        """旧的单目录键不该复活"""
+        self.gui.input_dir_var.set(self.dirs[0])
+        self.gui.save_config()
+        with open(self.cfg_file, encoding='utf-8') as f:
+            self.assertNotIn('input_dir', json.load(f))
+
+
 class TestStartConversionWiring(unittest.TestCase):
     """start_conversion 传给 Converter.run 的参数必须和新签名对齐。"""
 

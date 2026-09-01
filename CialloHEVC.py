@@ -35,7 +35,7 @@ for _std_stream in (sys.stdout, sys.stderr):
 
 # ==================== 版本号 ====================
 # 每次修改当前应用源码时，手动将版本号末位加一。
-APP_VERSION = "1.0.68"
+APP_VERSION = "1.0.69"
 
 # ↻ 递归开关放在输入行「浏览」按钮正上方的分组标题行留白里，不占用两行内部空间，
 # 因此行距和按钮间距全部保持原样。数值以「工作目录」分组框左上角为原点：
@@ -3043,6 +3043,7 @@ class ConverterGUI(ctk.CTk):
             self.config.crf = int(self.crf_var.get() or 18)
             self.config.target_ssim = float(self.ssim_var.get() or 0.95)
             self.config.preset = self.preset_var.get()
+            self.config.input_paths = self.split_dir_paths(self.input_dir_var.get())
             self.config.output_dir = self.output_dir_var.get()
             self.config.ffmpeg_path = self.ffmpeg_path_var.get()
             self.config.proxy_url = self.proxy_url_var.get()
