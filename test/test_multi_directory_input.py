@@ -89,11 +89,11 @@ class TestRecursiveButton(unittest.TestCase):
         self.assertIsInstance(self.gui.recursive_btn, ctk.CTkButton)
 
     def test_recursive_button_position(self):
-        """递归按钮贴容器右缘、位于输入输出行之间"""
+        """递归按钮贴分组框右缘、落在分组框上方的标题行留白里"""
         info = self.gui.recursive_btn.place_info()
         self.assertEqual(float(info['relx']), 1.0)
-        self.assertEqual(int(info['x']), -109)  # 落在 📋 与「浏览」之间的空隙
-        self.assertEqual(int(info['y']), 40)    # 输入10，输出55，中间40
+        self.assertEqual(int(info['x']), CialloHEVC.RECURSIVE_BTN_RIGHT_OFFSET)
+        self.assertEqual(int(info['y']), CialloHEVC.RECURSIVE_BTN_ABOVE_Y)
         self.assertEqual(info['anchor'], 'center')
 
     def _realize(self):
@@ -120,28 +120,33 @@ class TestRecursiveButton(unittest.TestCase):
         self.assertGreaterEqual(left, 0)
         self.assertLessEqual(right, container_width)
 
-    def test_recursive_button_sits_in_gap_between_paste_and_browse(self):
-        """按钮后置于两行之上，压住任一按钮都会劫持它的点击"""
+    def test_recursive_button_centered_above_input_browse(self):
+        """按钮必须与输入行「浏览」水平居中对齐，且完全落在它上方"""
         self._realize()
-        r_left, r_right = self._span(self.gui.recursive_btn)
-        p_left, p_right = self._span(self.gui.output_paste_btn)
-        b_left, b_right = self._span(self.gui.output_browse_btn)
-        self.assertTrue(
-            r_left >= p_right and r_right <= b_left,
-            f"递归按钮 {r_left}..{r_right} 未落在 📋 {p_left}..{p_right} "
-            f"与浏览 {b_left}..{b_right} 之间的空隙内",
+        r, b = self.gui.recursive_btn, self.gui.input_browse_btn
+        self.assertGreater(r.winfo_width(), 1, "按钮未完成布局，几何断言无意义")
+        self.assertEqual(
+            r.winfo_rootx() + r.winfo_width() // 2,
+            b.winfo_rootx() + b.winfo_width() // 2,
+            "递归按钮未与输入行「浏览」按钮水平居中对齐",
+        )
+        self.assertLessEqual(
+            r.winfo_rooty() + r.winfo_height(), b.winfo_rooty(),
+            "递归按钮未完全位于「浏览」按钮上方",
         )
 
-    def test_gap_matches_button_real_width(self):
-        """空隙宽度必须等于按钮实宽：多出的部分会在按钮上下露成空白洞"""
+    def test_recursive_button_does_not_overlap_rows(self):
+        """按钮落在分组框上方留白里，不得压住任一输入输出控件"""
         self._realize()
-        real_width = self.gui.recursive_btn.winfo_width()
-        self.assertGreater(real_width, 1, "按钮未完成布局，几何断言无意义")
-        self.assertEqual(
-            CialloHEVC.RECURSIVE_BTN_GAP, real_width,
-            f"让位空隙 {CialloHEVC.RECURSIVE_BTN_GAP} 与按钮实宽 {real_width} 不一致，"
-            f"差值会在按钮上下露出空白",
-        )
+        r = self.gui.recursive_btn
+        r_top, r_bottom = r.winfo_rooty(), r.winfo_rooty() + r.winfo_height()
+        for name in ('input_entry', 'input_browse_btn', 'output_entry',
+                     'output_paste_btn', 'output_browse_btn'):
+            w = getattr(self.gui, name)
+            self.assertLessEqual(
+                r_bottom, w.winfo_rooty(),
+                f"递归按钮 {r_top}..{r_bottom} 与 {name} 垂直重叠，会劫持它的点击",
+            )
 
     def test_recursive_button_initial_state(self):
         """递归按钮初始关闭：透明背景、灰色图标"""

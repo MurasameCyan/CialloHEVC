@@ -35,12 +35,13 @@ for _std_stream in (sys.stdout, sys.stderr):
 
 # ==================== 版本号 ====================
 # 每次修改当前应用源码时，手动将版本号末位加一。
-APP_VERSION = "1.0.66"
+APP_VERSION = "1.0.67"
 
-# ↻ 递归开关落在两行 📋 与「浏览」之间的空隙里，输入框容器右侧按此值留白让位。
-# CTkButton 实宽是 max(width, 文字宽 + corner_radius*2)，此处等于 38；空隙必须
-# 与实宽一致：留多了会在按钮上下露出空白，留少了按钮会压住相邻按钮。
-RECURSIVE_BTN_GAP = 38
+# ↻ 递归开关放在输入行「浏览」按钮正上方的分组标题行留白里，不占用两行内部空间，
+# 因此行距和按钮间距全部保持原样。数值以「工作目录」分组框左上角为原点：
+# 负 y 表示落在分组框上方的标题行内，x 相对容器右缘对齐浏览按钮水平中心。
+RECURSIVE_BTN_ABOVE_Y = -19
+RECURSIVE_BTN_RIGHT_OFFSET = -50
 
 GITHUB_FFMPEG_API_URL = "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest"
 GITHUB_FFMPEG_RELEASE_URL = "https://github.com/GyanD/codexffmpeg/releases/latest"
@@ -1869,7 +1870,7 @@ class ConverterGUI(ctk.CTk):
         ctk.CTkLabel(input_row, text="输入:", font=("Segoe UI", 12), width=50).pack(side="left", padx=(0, 5))
         
         input_field = ctk.CTkFrame(input_row, fg_color="transparent")
-        input_field.pack(side="left", fill="x", expand=True, padx=(0, RECURSIVE_BTN_GAP))
+        input_field.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
         self.input_entry = ctk.CTkEntry(input_field, textvariable=self.input_dir_var, height=35)
         self.input_entry.pack(side="left", fill="x", expand=True)
@@ -1885,10 +1886,12 @@ class ConverterGUI(ctk.CTk):
         input_paste_btn.pack(side="right", padx=(5, 0))
         self.create_tooltip(input_paste_btn, "从剪贴板粘贴输入目录")
         
-        ctk.CTkButton(input_row, text="浏览", command=self.browse_input_dir, width=80, height=35,
-                     fg_color=("#9C27B0", "#7B1FA2"),
-                     hover_color=("#7B1FA2", "#6A1B9A"),
-                     corner_radius=8).pack(side="left", padx=(0, 10))
+        self.input_browse_btn = ctk.CTkButton(
+            input_row, text="浏览", command=self.browse_input_dir, width=80, height=35,
+            fg_color=("#9C27B0", "#7B1FA2"),
+            hover_color=("#7B1FA2", "#6A1B9A"),
+            corner_radius=8)
+        self.input_browse_btn.pack(side="left", padx=(0, 10))
 
         # 第二行：输出目录
         output_row = ctk.CTkFrame(container, fg_color="transparent")
@@ -1897,7 +1900,7 @@ class ConverterGUI(ctk.CTk):
         ctk.CTkLabel(output_row, text="输出:", font=("Segoe UI", 12), width=50).pack(side="left", padx=(0, 5))
         
         output_field = ctk.CTkFrame(output_row, fg_color="transparent")
-        output_field.pack(side="left", fill="x", expand=True, padx=(0, RECURSIVE_BTN_GAP))
+        output_field.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
         self.output_entry = ctk.CTkEntry(output_field, textvariable=self.output_dir_var, height=35)
         self.output_entry.pack(side="left", fill="x", expand=True)
@@ -1936,7 +1939,7 @@ class ConverterGUI(ctk.CTk):
         # ↻ 递归子目录开关
         self.recursive_enabled = self.config.recursive_subdirs
         self.recursive_btn = ctk.CTkButton(
-            container, text="↻",
+            parent.master, text="↻",
             command=self.toggle_recursive,
             width=38, height=22,
             fg_color="transparent",
@@ -1945,7 +1948,11 @@ class ConverterGUI(ctk.CTk):
             corner_radius=11,
             border_spacing=0,
             font=("Segoe UI", 14))
-        self.recursive_btn.place(relx=1.0, x=-109, y=40, anchor="center")
+        self.recursive_btn.place(
+            in_=parent, relx=1.0, rely=0.0,
+            x=RECURSIVE_BTN_RIGHT_OFFSET,
+            y=RECURSIVE_BTN_ABOVE_Y,
+            anchor="center")
         self.create_tooltip(self.recursive_btn, "递归扫描子目录")
         self._apply_recursive_state()
 
