@@ -1,6 +1,6 @@
 # CialloHEVC
 
-> 来都来了 不点个⭐再走吗~?
+来都来了 不点个⭐再走吗~?
 
 基于 FFmpeg 的批量 HEVC 转码工具，带 SSIM 质量自动校准。给一个目录，它会逐个转码，并自动调整质量参数直到画质达标。
 
@@ -52,12 +52,8 @@ python -m venv .venv
 
 测试全部使用替身，不调用真实 ffmpeg，也不访问网络。
 
-## 开发约定
-
-`CialloHEVC.py` 顶部的 `APP_VERSION` 在每次改动源码时手动递增末位。GitHub Actions 以此判断是否发布：版本号变了就自动建 tag 并发布新的 Release，没变则只构建不发布。
 
 ## 说明
 
 - `convert_icon.py` 用于把 `icon.png` 转成 `icon.ico`，仓库里没有包含 `icon.png`，需要自备图源才能用；打包所需的 `icon.ico` 已在仓库中
-- `config.json`、`history.json`、`log/` 是本地运行产物，不纳入版本控制
 - FFmpeg 本体不随仓库分发，请通过界面下载或自行准备
