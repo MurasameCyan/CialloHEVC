@@ -20,6 +20,16 @@ from CialloHEVC import Config, ConverterGUI
 from test_multi_directory_input import patch_config_path
 
 
+def _long_path(p):
+    """把 8.3 短名归一成长名再比较。
+
+    CI runner 的 TEMP 是 C:\\Users\\RUNNER~1\\...，而 shell 的
+    SIGDN_FILESYSPATH 返回展开后的 C:\\Users\\runneradmin\\...，
+    直接 normpath 比较会假失败。realpath 在 Windows 上会解析短名别名。
+    """
+    return os.path.normcase(os.path.realpath(p))
+
+
 @unittest.skipUnless(sys.platform == 'win32', '原生对话框仅 Windows')
 class TestNativeDialogPlumbing(unittest.TestCase):
     """直接打真实 COM 接口，不 Show —— vtable 索引写错这里就炸"""
@@ -63,7 +73,7 @@ class TestNativeDialogPlumbing(unittest.TestCase):
                 got = CialloHEVC._shell_item_path(item)
             finally:
                 CialloHEVC._com_release(item)
-        self.assertEqual(os.path.normpath(got), os.path.normpath(d))
+        self.assertEqual(_long_path(got), _long_path(d))
 
     def test_shell_item_array_paths_on_real_array(self):
         """结果解析走真实 IShellItemArray：GetResults 之后的整条链路都验到。
@@ -89,7 +99,7 @@ class TestNativeDialogPlumbing(unittest.TestCase):
                     CialloHEVC._com_release(arr)
             finally:
                 CialloHEVC._com_release(item)
-        self.assertEqual(got, [os.path.normpath(d)])
+        self.assertEqual([_long_path(p) for p in got], [_long_path(d)])
 
 
 class TestBrowseInputDirUsesNativePicker(unittest.TestCase):
