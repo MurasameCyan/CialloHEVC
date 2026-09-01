@@ -37,9 +37,10 @@ for _std_stream in (sys.stdout, sys.stderr):
 # 每次修改当前应用源码时，手动将版本号末位加一。
 APP_VERSION = "1.0.66"
 
-# ↻ 递归开关放在两行「浏览」按钮右侧的留白里。corner_radius=999 会把 38px 的按钮
-# 撑到 55px 实宽，留白必须按实宽预留，否则按钮会溢出容器被裁掉。
-RECURSIVE_BTN_GAP = 48
+# ↻ 递归开关落在两行 📋 与「浏览」之间的空隙里，输入框容器右侧按此值留白让位。
+# CTkButton 实宽是 max(width, 文字宽 + corner_radius*2)，此处等于 38；空隙必须
+# 与实宽一致：留多了会在按钮上下露出空白，留少了按钮会压住相邻按钮。
+RECURSIVE_BTN_GAP = 38
 
 GITHUB_FFMPEG_API_URL = "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest"
 GITHUB_FFMPEG_RELEASE_URL = "https://github.com/GyanD/codexffmpeg/releases/latest"
@@ -1944,7 +1945,7 @@ class ConverterGUI(ctk.CTk):
             corner_radius=11,
             border_spacing=0,
             font=("Segoe UI", 14))
-        self.recursive_btn.place(relx=1.0, x=-114, y=40, anchor="center")
+        self.recursive_btn.place(relx=1.0, x=-109, y=40, anchor="center")
         self.create_tooltip(self.recursive_btn, "递归扫描子目录")
         self._apply_recursive_state()
 
