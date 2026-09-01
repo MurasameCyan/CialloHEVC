@@ -34,8 +34,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller==6.22.2
 
-      # 测试不拦发布：这套用例含真窗口几何与真实 ffmpeg 转码，在 runner 上属于
-      # 环境相关，卡住或失败也不该让 exe 发不出去。真正的门禁是本地
+      # 测试不拦发布：这套用例要建真窗口量控件坐标、还会直接打 shell 的 COM 接口，
+      # 在 runner 上属于环境相关，卡住或失败也不该让 exe 发不出去。真正的门禁是本地
       # `.venv/Scripts/python.exe -m unittest discover -s test`。
       - name: Run tests
         continue-on-error: true
