@@ -1847,7 +1847,7 @@ class ConverterGUI(ctk.CTk):
     
     def build_dir_section(self, parent):
         # 从配置加载或使用当前目录作为默认值
-        default_input = self.config.input_dir if self.config.input_dir else os.getcwd()
+        default_input = self.config.input_paths[0] if self.config.input_paths else os.getcwd()
         default_output = self.config.output_dir if self.config.output_dir else os.getcwd()
         
         self.input_dir_var = ctk.StringVar(value=default_input)
@@ -1927,6 +1927,22 @@ class ConverterGUI(ctk.CTk):
             font=("Segoe UI Emoji", 10))
         self.sync_btn.place(x=25, y=40, anchor="center")
         self.create_tooltip(self.sync_btn, "开启后输出目录始终等于输入目录")
+
+        # ↻ 递归子目录开关
+        self.recursive_enabled = self.config.recursive_subdirs
+        self.recursive_btn = ctk.CTkButton(
+            container, text="↻",
+            command=self.toggle_recursive,
+            width=38, height=38,
+            fg_color="transparent",
+            hover=False,
+            text_color="gray",
+            corner_radius=999,
+            border_spacing=0,
+            font=("Segoe UI", 16))
+        self.recursive_btn.place(x=625, y=40)
+        self.create_tooltip(self.recursive_btn, "递归扫描子目录")
+        self._apply_recursive_state()
 
         # 路径即时校验：输入目录必须已存在；输出目录允许不存在（开始转码时会自动创建）
         self._dir_border_color = self.input_entry.cget("border_color")
@@ -2854,6 +2870,20 @@ class ConverterGUI(ctk.CTk):
         self._apply_sync_dirs_state()
         self.config.sync_dirs = enabled
         self.config.save()
+
+    def toggle_recursive(self):
+        """切换递归扫描状态"""
+        self.recursive_enabled = not self.recursive_enabled
+        self.config.recursive_subdirs = self.recursive_enabled
+        self.config.save()
+        self._apply_recursive_state()
+
+    def _apply_recursive_state(self):
+        """应用递归开关状态（颜色+tooltip）"""
+        if self.recursive_enabled:
+            self.recursive_btn.configure(fg_color='#1f6aa5', text_color='white')
+        else:
+            self.recursive_btn.configure(fg_color='transparent', text_color='gray')
 
     def browse_input_dir(self):
         d = filedialog.askdirectory(initialdir=self.input_dir_var.get(), title="选择输入目录")
