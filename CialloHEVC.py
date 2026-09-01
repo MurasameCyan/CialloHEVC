@@ -1166,7 +1166,28 @@ class Converter:
                 try: os.remove(ssim_log)
                 except: pass
     
-    def run(self, input_dir, output_dir, skip_hevc_callback=None):
+    def _collect_files(self, input_paths, recursive):
+        """从多个输入目录收集视频文件，按 config.exts 过滤并去重。
+
+        去重用 resolve() 后的绝对路径：父目录和子目录同时被选中时，
+        递归扫描会把同一个文件找到两次。
+        """
+        files = []
+        seen = set()
+        for path_str in input_paths:
+            path = Path(path_str)
+            if not path.is_dir():
+                continue
+            for ext in self.config.exts:
+                found = path.rglob(f"*.{ext}") if recursive else path.glob(f"*.{ext}")
+                for f in found:
+                    key = f.resolve()
+                    if key not in seen:
+                        seen.add(key)
+                        files.append(f)
+        return files
+
+    def run(self, input_paths, output_dir, recursive_subdirs=False, skip_hevc_callback=None):
         self.is_running = True
         self.should_stop = False
         self.ssim_results = []
@@ -1188,11 +1209,9 @@ class Converter:
             self.is_running = False
             return
         
-        # 从输入目录查找文件
-        files = []
-        for ext in self.config.exts:
-            files.extend(Path(input_dir).glob(f"*.{ext}"))
-        
+        # 从输入目录列表查找文件，递归开关决定扫描深度
+        files = self._collect_files(input_paths, recursive_subdirs)
+
         total = len(files)
         if total == 0:
             self.log("未找到视频文件")
@@ -3351,11 +3370,16 @@ class ConverterGUI(ctk.CTk):
         self._ui(_update)
     
     def start_conversion(self):
-        input_dir = self.input_dir_var.get().strip()
+        input_paths = self.split_dir_paths(self.input_dir_var.get())
         output_dir = self.output_dir_var.get().strip()
-        
-        if not os.path.isdir(input_dir):
-            self.show_dialog("错误: 输入目录不存在", "", dialog_type="error")
+
+        if not input_paths:
+            self.show_dialog("错误: 输入目录不能为空", "", dialog_type="error")
+            return
+
+        missing = [p for p in input_paths if not os.path.isdir(p)]
+        if missing:
+            self.show_dialog("错误: 输入目录不存在", '\n'.join(missing), dialog_type="error")
             return
         
         if not output_dir:
@@ -3386,6 +3410,7 @@ class ConverterGUI(ctk.CTk):
             return
 
         # 记住本次实际使用的目录，重启后不再退回上次"保存配置"时的路径
+        self.config.input_paths = input_paths
         self.config.output_dir = output_dir
         try:
             self.config.save()
@@ -3523,7 +3548,8 @@ class ConverterGUI(ctk.CTk):
         
         def worker():
             try:
-                self.converter.run(input_dir, output_dir, skip_hevc_callback)
+                self.converter.run(input_paths, output_dir,
+                                   self.recursive_enabled, skip_hevc_callback)
             except Exception as e:
                 self.log(f"\n[错误] {e}")
             finally:

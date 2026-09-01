@@ -1,5 +1,6 @@
 import unittest
 import tempfile
+import inspect
 import json
 import os
 from pathlib import Path
@@ -275,6 +276,104 @@ class TestMultiDirectoryBrowse(unittest.TestCase):
         self.gui.sync_dirs_var.set(True)
         self.gui.input_dir_var.set(';'.join(self.dirs))
         self.assertEqual(self.gui.output_dir_var.get(), os.path.normpath(self.dirs[0]))
+
+
+class TestStartConversionWiring(unittest.TestCase):
+    """start_conversion 传给 Converter.run 的参数必须和新签名对齐。"""
+
+    def test_run_signature_takes_paths_and_recursive(self):
+        import inspect
+        params = list(inspect.signature(CialloHEVC.Converter.run).parameters)
+        self.assertEqual(params[:4], ['self', 'input_paths', 'output_dir', 'recursive_subdirs'])
+
+    def test_start_conversion_passes_list_and_recursive_flag(self):
+        src = inspect.getsource(CialloHEVC.ConverterGUI.start_conversion)
+        self.assertIn('input_paths = self.split_dir_paths(self.input_dir_var.get())', src)
+        self.assertIn('self.config.input_paths = input_paths', src)
+        self.assertIn('self.converter.run(input_paths, output_dir,', src)
+        self.assertIn('self.recursive_enabled', src)
+        self.assertNotIn('os.path.isdir(input_dir)', src)
+
+
+class TestFileCollection(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.dirs = [os.path.join(self.temp_dir, n) for n in ('one', 'two', 'empty')]
+        for d in self.dirs:
+            os.makedirs(d)
+        Path(self.dirs[0], 'a.mp4').touch()
+        Path(self.dirs[0], 'b.mkv').touch()
+        Path(self.dirs[0], 'notes.txt').touch()
+        Path(self.dirs[1], 'c.avi').touch()
+        sub = Path(self.dirs[1], 'sub')
+        sub.mkdir()
+        Path(sub, 'd.mp4').touch()
+        Path(sub, 'deeper').mkdir()
+        Path(sub, 'deeper', 'e.mkv').touch()
+
+        cfg = Config()
+        cfg.exts = ['mp4', 'mkv', 'avi']
+        self.converter = CialloHEVC.Converter(cfg, {'log': lambda *a: None})
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def names(self, paths):
+        return sorted(Path(p).name for p in paths)
+
+    def test_collect_files_non_recursive_skips_subdirs(self):
+        files = self.converter._collect_files(self.dirs[:2], recursive=False)
+        self.assertEqual(self.names(files), ['a.mp4', 'b.mkv', 'c.avi'])
+
+    def test_collect_files_recursive_includes_all_depths(self):
+        files = self.converter._collect_files(self.dirs[:2], recursive=True)
+        self.assertEqual(self.names(files), ['a.mp4', 'b.mkv', 'c.avi', 'd.mp4', 'e.mkv'])
+
+    def test_collect_files_filters_by_configured_extensions(self):
+        """非视频扩展名不能进来"""
+        files = self.converter._collect_files([self.dirs[0]], recursive=True)
+        self.assertNotIn('notes.txt', self.names(files))
+
+    def test_collect_files_empty_dir_returns_empty(self):
+        self.assertEqual(self.converter._collect_files([self.dirs[2]], recursive=False), [])
+
+    def test_collect_files_skips_nonexistent_path(self):
+        """路径不存在只跳过，不抛异常"""
+        missing = os.path.join(self.temp_dir, 'gone')
+        files = self.converter._collect_files([self.dirs[0], missing], recursive=False)
+        self.assertEqual(self.names(files), ['a.mp4', 'b.mkv'])
+
+    def test_collect_files_deduplicates_repeated_dir(self):
+        files = self.converter._collect_files([self.dirs[0], self.dirs[0]], recursive=False)
+        self.assertEqual(self.names(files), ['a.mp4', 'b.mkv'])
+
+    @unittest.skipUnless(os.name == 'nt', 'junction 是 Windows 特性')
+    def test_collect_files_survives_directory_junction_loop(self):
+        """子目录里有指回父目录的 junction 时，rglob 会重复命中同一文件。
+
+        去重必须按 resolve() 后的真实路径判断，否则同一个文件会被转码几十次。
+        """
+        import subprocess
+        target = self.dirs[0]
+        link = os.path.join(target, 'loop')
+        made = subprocess.run(['cmd', '/c', 'mklink', '/J', link, target],
+                              capture_output=True, text=True)
+        if made.returncode != 0:
+            self.skipTest('无法创建 junction')
+        try:
+            raw = list(Path(target).rglob('*.mp4'))
+            files = self.converter._collect_files([target], recursive=True)
+            self.assertGreater(len(raw), 1, 'junction 未被 rglob 跟随，这个用例失去意义')
+            self.assertEqual(self.names(files), ['a.mp4', 'b.mkv'])
+        finally:
+            subprocess.run(['cmd', '/c', 'rmdir', link], capture_output=True)
+
+    def test_collect_files_deduplicates_nested_parent_and_child(self):
+        """递归选了父目录又选了子目录，文件不能被转码两次"""
+        files = self.converter._collect_files(
+            [self.dirs[1], os.path.join(self.dirs[1], 'sub')], recursive=True)
+        self.assertEqual(self.names(files), ['c.avi', 'd.mp4', 'e.mkv'])
 
 
 if __name__ == '__main__':
