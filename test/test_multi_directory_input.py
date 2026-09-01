@@ -240,20 +240,50 @@ class TestMultiDirectoryBrowse(unittest.TestCase):
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_build_input_tooltip_formats_multiline(self):
+    def test_build_dir_list_tooltip_formats_multiline(self):
         """多路径 tooltip 每行一个，单行输入框看不全时靠它看全"""
         self.assertEqual(
-            self.gui._build_input_tooltip(r'D:\a;D:\b;D:\c'),
+            self.gui._build_dir_list_tooltip(r'D:\a;D:\b;D:\c'),
             'D:\\a\nD:\\b\nD:\\c',
         )
 
-    def test_build_input_tooltip_single_path(self):
+    def test_build_dir_list_tooltip_single_path(self):
         """单路径不加换行"""
-        self.assertEqual(self.gui._build_input_tooltip(r'D:\single'), r'D:\single')
+        self.assertEqual(self.gui._build_dir_list_tooltip(r'D:\single'), r'D:\single')
 
-    def test_build_input_tooltip_ignores_blank_segments(self):
+    def test_build_dir_list_tooltip_ignores_blank_segments(self):
         """尾随分号和空段不产生空行"""
-        self.assertEqual(self.gui._build_input_tooltip(r'D:\a; ;D:\b;'), 'D:\\a\nD:\\b')
+        self.assertEqual(
+            self.gui._build_dir_list_tooltip(r'D:\a; ;D:\b;'), 'D:\\a\nD:\\b')
+
+    def test_output_entry_gets_dir_list_tooltip(self):
+        """输出框要和输入框一样挂悬停列表，文本按当前值展开成一行一个
+
+        CTkEntry.bind 的返回值不可靠（customtkinter 转发给内部 entry），
+        所以不去查绑定，直接盯 create_tooltip 收到的 widget 和取文本的 callable。
+        """
+        pairs = []
+        real = CialloHEVC.ConverterGUI.create_tooltip
+
+        def spy(gui, widget, text_or_func):
+            pairs.append((widget, text_or_func))
+            return real(gui, widget, text_or_func)
+
+        with mock.patch.object(CialloHEVC.ConverterGUI, 'create_tooltip', spy):
+            gui = ConverterGUI()
+        gui.withdraw()
+        self.addCleanup(gui.destroy)
+
+        for entry_name in ('input_entry', 'output_entry'):
+            entry = getattr(gui, entry_name)
+            getters = [f for w, f in pairs if w is entry]
+            self.assertTrue(getters, f'{entry_name} 没挂 tooltip')
+            self.assertTrue(callable(getters[0]),
+                            f'{entry_name} 的 tooltip 是死字符串，多目录时不会更新')
+
+        gui.output_dir_var.set(r'D:\a; ;D:\b;')
+        getter = next(f for w, f in pairs if w is gui.output_entry)
+        self.assertEqual(getter(), 'D:\\a\nD:\\b')
 
     def test_browse_replaces_with_all_selected_dirs(self):
         """连续选择直到取消，输入框以分号拼接全部选择（替换而非累加）"""

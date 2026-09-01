@@ -35,7 +35,7 @@ for _std_stream in (sys.stdout, sys.stderr):
 
 # ==================== 版本号 ====================
 # 每次修改当前应用源码时，手动将版本号末位加一。
-APP_VERSION = "1.0.73"
+APP_VERSION = "1.0.74"
 
 # ↻ 递归开关与 🔗 同步开关并排放在分组标题行留白里，不占用两行内部空间，
 # 因此行距和按钮间距全部保持原样。数值以「工作目录」分组框左上角为原点：
@@ -2066,7 +2066,7 @@ class ConverterGUI(ctk.CTk):
         self.input_entry.pack(side="left", fill="x", expand=True)
         # 传 callable：单行装不下的多目录列表，每次悬停按当前值展开成多行
         self.create_tooltip(
-            self.input_entry, lambda: self._build_input_tooltip(self.input_dir_var.get()))
+            self.input_entry, lambda: self._build_dir_list_tooltip(self.input_dir_var.get()))
 
         input_paste_btn = ctk.CTkButton(
             input_field, text="📋",
@@ -2097,6 +2097,9 @@ class ConverterGUI(ctk.CTk):
 
         self.output_entry = ctk.CTkEntry(output_field, textvariable=self.output_dir_var, height=35)
         self.output_entry.pack(side="left", fill="x", expand=True)
+        # 与输入框同样处理：🔗 开启时这里是整串分号路径，悬停展开成一行一个
+        self.create_tooltip(
+            self.output_entry, lambda: self._build_dir_list_tooltip(self.output_dir_var.get()))
 
         self.output_paste_btn = ctk.CTkButton(
             output_field, text="📋",
@@ -3041,8 +3044,8 @@ class ConverterGUI(ctk.CTk):
                 seen.append(part)
         return seen
 
-    def _build_input_tooltip(self, paths_string):
-        """输入框只有单行，多路径靠 tooltip 每行一个看全。"""
+    def _build_dir_list_tooltip(self, paths_string):
+        """输入框和输出框都只有一行，多目录靠 tooltip 每行一个看全。"""
         return '\n'.join(self.split_dir_paths(paths_string))
 
     def refresh_dir_entry(self, entry, target_var, allow_parent=False):
