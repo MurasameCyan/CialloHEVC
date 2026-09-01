@@ -65,6 +65,7 @@ class FakeGUI:
     refresh_dir_entry = MODULE.ConverterGUI.refresh_dir_entry
     sync_output_to_input = MODULE.ConverterGUI.sync_output_to_input
     _apply_sync_dirs_state = MODULE.ConverterGUI._apply_sync_dirs_state
+    split_dir_paths = staticmethod(MODULE.ConverterGUI.split_dir_paths)
 
     def __init__(self, clipboard_value=None, clipboard_error=None):
         self.clipboard_value = clipboard_value

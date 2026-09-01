@@ -1853,7 +1853,7 @@ class ConverterGUI(ctk.CTk):
     
     def build_dir_section(self, parent):
         # 从配置加载或使用当前目录作为默认值
-        default_input = self.config.input_paths[0] if self.config.input_paths else os.getcwd()
+        default_input = ';'.join(self.config.input_paths) if self.config.input_paths else os.getcwd()
         default_output = self.config.output_dir if self.config.output_dir else os.getcwd()
         
         self.input_dir_var = ctk.StringVar(value=default_input)
@@ -1874,6 +1874,9 @@ class ConverterGUI(ctk.CTk):
 
         self.input_entry = ctk.CTkEntry(input_field, textvariable=self.input_dir_var, height=35)
         self.input_entry.pack(side="left", fill="x", expand=True)
+        # 传 callable：单行装不下的多目录列表，每次悬停按当前值展开成多行
+        self.create_tooltip(
+            self.input_entry, lambda: self._build_input_tooltip(self.input_dir_var.get()))
 
         input_paste_btn = ctk.CTkButton(
             input_field, text="📋",
@@ -2832,16 +2835,32 @@ class ConverterGUI(ctk.CTk):
         if entry is not None:
             entry.xview_moveto(1)
 
+    @staticmethod
+    def split_dir_paths(paths_string):
+        """把分号分隔的多目录串拆成列表，顺序保留、去重、丢掉空段和包裹引号。"""
+        seen = []
+        for part in (paths_string or '').split(';'):
+            part = part.strip().strip('"').strip()
+            if part and part not in seen:
+                seen.append(part)
+        return seen
+
+    def _build_input_tooltip(self, paths_string):
+        """输入框只有单行，多路径靠 tooltip 每行一个看全。"""
+        return '\n'.join(self.split_dir_paths(paths_string))
+
     def refresh_dir_entry(self, entry, target_var, allow_parent=False):
         """目录不可用时把输入框边框标红。
 
+        输入框可以是分号分隔的多目录，逐段校验，任一段不可用就标红。
         allow_parent=True 用于输出目录：它可以还不存在，只要父目录在，
         开始转码时会自动创建。
         """
-        path = target_var.get().strip().strip('"')
-        usable = bool(path) and (
+        paths = self.split_dir_paths(target_var.get())
+        usable = bool(paths) and all(
             os.path.isdir(path)
             or (allow_parent and os.path.isdir(os.path.dirname(path.rstrip('\\/')) or path))
+            for path in paths
         )
         entry.configure(border_color=self._dir_border_color if usable else ("#F44336", "#EF5350"))
 
@@ -2849,9 +2868,10 @@ class ConverterGUI(ctk.CTk):
         """同步开启时，让输出目录持续跟随输入目录。"""
         if not self.sync_dirs_var.get():
             return
-        input_dir = self.input_dir_var.get().strip().strip('"')
-        if input_dir:
-            self.output_dir_var.set(os.path.normpath(input_dir))
+        # 多目录时输出框只显示第一个：整串分号路径不是合法目录
+        paths = self.split_dir_paths(self.input_dir_var.get())
+        if paths:
+            self.output_dir_var.set(os.path.normpath(paths[0]))
             self.scroll_entry_to_end(self.output_entry)
 
     def _apply_sync_dirs_state(self):
@@ -2898,9 +2918,23 @@ class ConverterGUI(ctk.CTk):
             self.recursive_btn.configure(fg_color="transparent", text_color=("gray40", "gray75"))
 
     def browse_input_dir(self):
-        d = filedialog.askdirectory(initialdir=self.input_dir_var.get(), title="选择输入目录")
-        if d:
-            self.input_dir_var.set(os.path.normpath(d))
+        """可连续选择多个输入目录，取消结束；选到的目录整体替换原有内容。"""
+        existing = self.split_dir_paths(self.input_dir_var.get())
+        initial = os.path.normpath(existing[0]) if existing else os.getcwd()
+
+        picked = []
+        while True:
+            d = filedialog.askdirectory(
+                initialdir=initial, title="选择输入目录（可继续选择，取消结束）")
+            if not d:
+                break
+            d = os.path.normpath(d)
+            if d not in picked:
+                picked.append(d)
+            initial = d
+
+        if picked:
+            self.input_dir_var.set(';'.join(picked))
             self.scroll_entry_to_end(self.input_entry)
 
     def browse_output_dir(self):

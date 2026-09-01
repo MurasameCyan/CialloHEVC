@@ -182,5 +182,100 @@ class TestRecursiveButton(unittest.TestCase):
         self.assertEqual(gui2.recursive_btn.cget('text_color'), 'white')
 
 
+class TestMultiDirectoryBrowse(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        patch_config_path(self, os.path.join(self.temp_dir, 'config.json'))
+        self.gui = ConverterGUI()
+        self.gui.withdraw()
+        self.dirs = [os.path.join(self.temp_dir, n) for n in ('a', 'b', 'c')]
+        for d in self.dirs:
+            os.makedirs(d)
+
+    def tearDown(self):
+        self.gui.destroy()
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_build_input_tooltip_formats_multiline(self):
+        """多路径 tooltip 每行一个，单行输入框看不全时靠它看全"""
+        self.assertEqual(
+            self.gui._build_input_tooltip(r'D:\a;D:\b;D:\c'),
+            'D:\\a\nD:\\b\nD:\\c',
+        )
+
+    def test_build_input_tooltip_single_path(self):
+        """单路径不加换行"""
+        self.assertEqual(self.gui._build_input_tooltip(r'D:\single'), r'D:\single')
+
+    def test_build_input_tooltip_ignores_blank_segments(self):
+        """尾随分号和空段不产生空行"""
+        self.assertEqual(self.gui._build_input_tooltip(r'D:\a; ;D:\b;'), 'D:\\a\nD:\\b')
+
+    def test_browse_replaces_with_all_selected_dirs(self):
+        """连续选择直到取消，输入框以分号拼接全部选择（替换而非累加）"""
+        self.gui.input_dir_var.set(r'D:\old')
+        picks = list(self.dirs) + ['']
+        with mock.patch.object(CialloHEVC.filedialog, 'askdirectory',
+                               side_effect=picks) as dialog:
+            self.gui.browse_input_dir()
+        self.assertEqual(dialog.call_count, 4)
+        self.assertEqual(
+            self.gui.input_dir_var.get(),
+            ';'.join(os.path.normpath(d) for d in self.dirs),
+        )
+
+    def test_browse_cancelled_immediately_keeps_previous_value(self):
+        """第一次就取消，不能清空已有路径"""
+        self.gui.input_dir_var.set(r'D:\keep')
+        with mock.patch.object(CialloHEVC.filedialog, 'askdirectory', return_value=''):
+            self.gui.browse_input_dir()
+        self.assertEqual(self.gui.input_dir_var.get(), r'D:\keep')
+
+    def test_browse_starts_from_first_existing_path(self):
+        """多路径时对话框从第一个路径起步，而不是拿整串当目录"""
+        self.gui.input_dir_var.set(';'.join(self.dirs))
+        with mock.patch.object(CialloHEVC.filedialog, 'askdirectory',
+                               return_value='') as dialog:
+            self.gui.browse_input_dir()
+        self.assertEqual(
+            dialog.call_args.kwargs['initialdir'], os.path.normpath(self.dirs[0]))
+
+    def test_browse_deduplicates_repeated_selection(self):
+        """重复选中同一目录只保留一份，否则会被转码两次"""
+        with mock.patch.object(CialloHEVC.filedialog, 'askdirectory',
+                               side_effect=[self.dirs[0], self.dirs[0], '']):
+            self.gui.browse_input_dir()
+        self.assertEqual(self.gui.input_dir_var.get(), os.path.normpath(self.dirs[0]))
+
+    def test_multi_path_value_keeps_default_border(self):
+        """多路径整串不是目录，校验必须逐段判断，否则输入框永远标红"""
+        self.gui.input_dir_var.set(';'.join(self.dirs))
+        self.assertEqual(
+            self.gui.input_entry.cget('border_color'), self.gui._dir_border_color)
+
+    def test_multi_path_with_one_missing_turns_border_red(self):
+        """任一段不存在就标红"""
+        self.gui.input_dir_var.set(self.dirs[0] + ';' + os.path.join(self.temp_dir, 'gone'))
+        self.assertEqual(
+            self.gui.input_entry.cget('border_color'), ("#F44336", "#EF5350"))
+
+    def test_startup_restores_multiple_paths_from_config(self):
+        """启动时把 config.input_paths 列表还原成分号串"""
+        self.gui.config.input_paths = list(self.dirs)
+        self.gui.config.save()
+
+        gui2 = ConverterGUI()
+        gui2.withdraw()
+        self.addCleanup(gui2.destroy)
+        self.assertEqual(gui2.input_dir_var.get(), ';'.join(self.dirs))
+
+    def test_sync_uses_first_path_when_multiple_selected(self):
+        """🔗 开启时输出框不能显示整串分号路径"""
+        self.gui.sync_dirs_var.set(True)
+        self.gui.input_dir_var.set(';'.join(self.dirs))
+        self.assertEqual(self.gui.output_dir_var.get(), os.path.normpath(self.dirs[0]))
+
+
 if __name__ == '__main__':
     unittest.main()
