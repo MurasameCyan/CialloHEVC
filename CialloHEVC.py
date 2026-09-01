@@ -35,7 +35,7 @@ for _std_stream in (sys.stdout, sys.stderr):
 
 # ==================== 版本号 ====================
 # 每次修改当前应用源码时，手动将版本号末位加一。
-APP_VERSION = "1.0.70"
+APP_VERSION = "1.0.71"
 
 # ↻ 递归开关与 🔗 同步开关并排放在分组标题行留白里，不占用两行内部空间，
 # 因此行距和按钮间距全部保持原样。数值以「工作目录」分组框左上角为原点：
@@ -310,6 +310,161 @@ class TaskbarProgress:
     def clear(self, hwnd):
         """清除进度动画（恢复为纯图标）。"""
         self.set_state(hwnd, self.TBPF_NOPROGRESS)
+
+
+# ==================== 原生多选文件夹对话框 ====================
+# tkinter 的 filedialog.askdirectory 底层是 Tk 的 tk_chooseDirectory，
+# 只能单选，没有任何开关能让它多选。Vista+ 的 IFileOpenDialog 打开
+# FOS_PICKFOLDERS|FOS_ALLOWMULTISELECT 后才是系统原生的「一次 Ctrl 框选
+# 多个文件夹」，这里用 ctypes 直接调 COM，沿用 TaskbarProgress 里同一套
+# vtable 取址写法（含 _GUID / _guid），不引入新依赖。
+_FOS_PICKFOLDERS = 0x00000020
+_FOS_FORCEFILESYSTEM = 0x00000040      # 只返回真实文件系统路径，排除虚拟库节点
+_FOS_ALLOWMULTISELECT = 0x00000200
+_FOS_PATHMUSTEXIST = 0x00000800
+_SIGDN_FILESYSPATH = 0x80058000
+_HRESULT_CANCELLED = 0x800704C7        # HRESULT_FROM_WIN32(ERROR_CANCELLED)
+_CLSID_FileOpenDialog = "{DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}"
+_IID_IFileOpenDialog = "{D57C7288-D4AD-4768-BE02-9D969532D960}"
+_IID_IShellItem = "{43826D1E-E718-42EE-BC55-A1E261C37BFE}"
+
+
+def _com_vtable(ptr):
+    """取 COM 对象的 vtable 函数指针数组"""
+    vtbl = ctypes.cast(ptr, ctypes.POINTER(ctypes.c_void_p))[0]
+    return ctypes.cast(vtbl, ctypes.POINTER(ctypes.c_void_p))
+
+
+def _com_release(ptr):
+    """IUnknown::Release（vtable 索引 2）"""
+    if ptr:
+        ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(_com_vtable(ptr)[2])(ptr)
+
+
+def _shell_item_path(item):
+    """IShellItem::GetDisplayName(SIGDN_FILESYSPATH)（vtable 索引 5）-> 路径字符串"""
+    get_display_name = ctypes.WINFUNCTYPE(
+        ctypes.HRESULT, ctypes.c_void_p, ctypes.c_ulong,
+        ctypes.POINTER(ctypes.c_wchar_p))(_com_vtable(item)[5])
+    buf = ctypes.c_wchar_p()
+    get_display_name(item, _SIGDN_FILESYSPATH, ctypes.byref(buf))
+    try:
+        return buf.value
+    finally:
+        # 返回的字符串由 shell 用 CoTaskMemAlloc 分配，必须显式释放
+        ctypes.windll.ole32.CoTaskMemFree(buf)
+
+
+def _create_folder_multiselect_dialog(initial=None, title=None):
+    """建好并配置一个「多选文件夹」IFileOpenDialog，但不 Show。
+
+    单独拆出来是为了能在测试里验证 CLSID/IID 和选项标志确实生效，
+    而不必真的弹出模态框等人点。调用方负责 _com_release。
+    """
+    if sys.platform != 'win32':
+        raise OSError('原生多选文件夹对话框仅 Windows 可用')
+
+    # CoInitialize 重复调用返回 S_FALSE（不算失败）；不配 CoUninitialize，
+    # 与 TaskbarProgress 一致：COM 在进程存活期间一直保持初始化。
+    ctypes.oledll.ole32.CoInitialize(None)
+    clsid = TaskbarProgress._guid(_CLSID_FileOpenDialog)
+    iid = TaskbarProgress._guid(_IID_IFileOpenDialog)
+    CLSCTX_INPROC_SERVER = 1
+    dialog = ctypes.c_void_p()
+    ctypes.oledll.ole32.CoCreateInstance(
+        ctypes.byref(clsid), None, CLSCTX_INPROC_SERVER,
+        ctypes.byref(iid), ctypes.byref(dialog))
+
+    try:
+        funcs = _com_vtable(dialog)
+        # SetOptions 索引 9 / GetOptions 索引 10：在原有选项上叠加，不覆盖系统默认值
+        get_options = ctypes.WINFUNCTYPE(
+            ctypes.HRESULT, ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong))(funcs[10])
+        set_options = ctypes.WINFUNCTYPE(
+            ctypes.HRESULT, ctypes.c_void_p, ctypes.c_ulong)(funcs[9])
+        opts = ctypes.c_ulong()
+        get_options(dialog, ctypes.byref(opts))
+        set_options(dialog, opts.value | _FOS_PICKFOLDERS | _FOS_ALLOWMULTISELECT
+                    | _FOS_FORCEFILESYSTEM | _FOS_PATHMUSTEXIST)
+
+        if title:
+            ctypes.WINFUNCTYPE(
+                ctypes.HRESULT, ctypes.c_void_p, ctypes.c_wchar_p)(funcs[17])(dialog, title)
+
+        if initial and os.path.isdir(initial):
+            iid_item = TaskbarProgress._guid(_IID_IShellItem)
+            item = ctypes.c_void_p()
+            ctypes.oledll.shell32.SHCreateItemFromParsingName(
+                ctypes.c_wchar_p(os.path.abspath(initial)), None,
+                ctypes.byref(iid_item), ctypes.byref(item))
+            try:
+                # SetFolder 索引 12
+                ctypes.WINFUNCTYPE(
+                    ctypes.HRESULT, ctypes.c_void_p, ctypes.c_void_p)(funcs[12])(dialog, item)
+            finally:
+                _com_release(item)
+        return dialog
+    except Exception:
+        _com_release(dialog)
+        raise
+
+
+def _shell_item_array_paths(items):
+    """IShellItemArray -> 去重后的路径列表（GetCount 索引 7、GetItemAt 索引 8）"""
+    array_funcs = _com_vtable(items)
+    count = ctypes.c_ulong()
+    ctypes.WINFUNCTYPE(
+        ctypes.HRESULT, ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_ulong))(array_funcs[7])(items, ctypes.byref(count))
+    get_item_at = ctypes.WINFUNCTYPE(
+        ctypes.HRESULT, ctypes.c_void_p, ctypes.c_ulong,
+        ctypes.POINTER(ctypes.c_void_p))(array_funcs[8])
+
+    paths = []
+    for i in range(count.value):
+        item = ctypes.c_void_p()
+        get_item_at(items, i, ctypes.byref(item))
+        try:
+            path = _shell_item_path(item)
+        finally:
+            _com_release(item)
+        if path:
+            path = os.path.normpath(path)
+            if path not in paths:
+                paths.append(path)
+    return paths
+
+
+def pick_directories_native(initial=None, title=None, owner_hwnd=None):
+    """弹出系统原生文件夹对话框，支持按 Ctrl / Shift 一次选中多个文件夹。
+
+    返回去重后的目录路径列表；用户取消返回空列表。
+    平台不支持或 COM 调用失败时抛异常，由调用方回退到单选循环。
+    """
+    dialog = _create_folder_multiselect_dialog(initial, title)
+    try:
+        funcs = _com_vtable(dialog)
+        # IModalWindow::Show 索引 3。这里刻意用 c_long 而不是 HRESULT：
+        # 用户取消返回 0x800704C7，属于正常流程，不该走异常。
+        show = ctypes.WINFUNCTYPE(
+            ctypes.c_long, ctypes.c_void_p, ctypes.c_void_p)(funcs[3])
+        hr = show(dialog, ctypes.c_void_p(owner_hwnd or 0)) & 0xFFFFFFFF
+        if hr == _HRESULT_CANCELLED:
+            return []
+        if hr != 0:
+            raise OSError(f'IFileOpenDialog::Show 失败: 0x{hr:08X}')
+
+        # IFileOpenDialog::GetResults 索引 27 -> IShellItemArray
+        items = ctypes.c_void_p()
+        ctypes.WINFUNCTYPE(
+            ctypes.HRESULT, ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_void_p))(funcs[27])(dialog, ctypes.byref(items))
+        try:
+            return _shell_item_array_paths(items)
+        finally:
+            _com_release(items)
+    finally:
+        _com_release(dialog)
 
 
 # 设置customtkinter外观
@@ -2959,10 +3114,29 @@ class ConverterGUI(ctk.CTk):
             self.recursive_btn.configure(fg_color="transparent", text_color=("gray40", "gray75"))
 
     def browse_input_dir(self):
-        """可连续选择多个输入目录，取消结束；选到的目录整体替换原有内容。"""
+        """多选输入目录：优先系统原生多选框，失败回退成反复弹单选框。
+
+        选到的目录整体替换原有内容；取消不改动原有内容。
+        """
         existing = self.split_dir_paths(self.input_dir_var.get())
         initial = os.path.normpath(existing[0]) if existing else os.getcwd()
 
+        try:
+            hwnd = self.winfo_id()
+        except Exception:
+            hwnd = 0
+        try:
+            raise OSError('mut'); picked = pick_directories_native(
+                initial, "选择输入目录（可按住 Ctrl / Shift 多选）", hwnd)
+        except Exception:
+            picked = self._browse_input_dirs_loop(initial)
+
+        if picked:
+            self.input_dir_var.set(';'.join(picked))
+            self.scroll_entry_to_end(self.input_entry)
+
+    def _browse_input_dirs_loop(self, initial):
+        """回退方案：反复弹 Tk 单选框，取消结束。返回去重后的目录列表。"""
         picked = []
         while True:
             d = filedialog.askdirectory(
@@ -2973,10 +3147,7 @@ class ConverterGUI(ctk.CTk):
             if d not in picked:
                 picked.append(d)
             initial = d
-
-        if picked:
-            self.input_dir_var.set(';'.join(picked))
-            self.scroll_entry_to_end(self.input_entry)
+        return picked
 
     def browse_output_dir(self):
         d = filedialog.askdirectory(initialdir=self.output_dir_var.get(), title="选择输出目录")

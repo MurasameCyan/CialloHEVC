@@ -214,6 +214,13 @@ class TestMultiDirectoryBrowse(unittest.TestCase):
         self.dirs = [os.path.join(self.temp_dir, n) for n in ('a', 'b', 'c')]
         for d in self.dirs:
             os.makedirs(d)
+        # browse_input_dir 现在优先走系统原生多选框，那是真模态框，无头跑会一直等人点。
+        # 本类断言的是回退用的「反复弹单选框」行为，所以强制原生路径失败。
+        # 原生路径本身由 test_native_multiselect_dialog.py 覆盖。
+        patcher = mock.patch.object(
+            CialloHEVC, 'pick_directories_native', side_effect=OSError('forced fallback'))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def tearDown(self):
         self.gui.destroy()
