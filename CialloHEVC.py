@@ -35,7 +35,7 @@ for _std_stream in (sys.stdout, sys.stderr):
 
 # ==================== 版本号 ====================
 # 每次修改当前应用源码时，手动将版本号末位加一。
-APP_VERSION = "1.0.67"
+APP_VERSION = "1.0.68"
 
 # ↻ 递归开关放在输入行「浏览」按钮正上方的分组标题行留白里，不占用两行内部空间，
 # 因此行距和按钮间距全部保持原样。数值以「工作目录」分组框左上角为原点：
@@ -1055,6 +1055,15 @@ class Converter:
         self.log(f"[警告] 无法删除未完成文件: {output_file}")
         return False
 
+    def _determine_output_dir(self, input_file, unified_output_dir):
+        """决定单个文件的输出目录。
+
+        🔗 开启时输出到源文件所在目录：多目录转码时全挤进一个输出目录会混淆来源。
+        """
+        if self.config.sync_dirs:
+            return str(Path(input_file).parent)
+        return unified_output_dir
+
     def process_file(self, input_file, output_dir, log_dir):
         if self.should_stop: return False
         
@@ -1086,6 +1095,8 @@ class Converter:
         
         # 输出文件保存到output_dir，格式：文件名(HEVC).后缀（按输出格式设置解析）
         out_ext = self._resolve_out_ext(input_file)
+        output_dir = self._determine_output_dir(input_file, output_dir)
+        os.makedirs(output_dir, exist_ok=True)
         output = os.path.join(output_dir, f"{name}(HEVC){out_ext}")
         if os.path.exists(output):
             self.log(f"[跳过] {output} 已存在")
@@ -1375,8 +1386,10 @@ class Converter:
         
         # 输出文件保存到output_dir，格式：文件名(HEVC).后缀（按输出格式设置解析）
         out_ext = self._resolve_out_ext(input_file)
+        output_dir = self._determine_output_dir(input_file, output_dir)
+        os.makedirs(output_dir, exist_ok=True)
         output = os.path.join(output_dir, f"{name}(HEVC){out_ext}")
-        
+
         timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
         ssim_log, _ssim_is_temp = self._make_ssim_log_path(log_dir, name, timestamp)
 

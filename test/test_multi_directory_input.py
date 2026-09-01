@@ -295,6 +295,112 @@ class TestStartConversionWiring(unittest.TestCase):
         self.assertNotIn('os.path.isdir(input_dir)', src)
 
 
+class TestOutputPathLogic(unittest.TestCase):
+    """🔗 开启时每个文件输出到自己的源目录，而不是全挤在统一输出目录。"""
+
+    def setUp(self):
+        self.cfg = Config()
+        self.converter = CialloHEVC.Converter(self.cfg, {'log': lambda *a: None})
+
+    def test_sync_enabled_uses_source_dir(self):
+        self.cfg.sync_dirs = True
+        got = self.converter._determine_output_dir(
+            os.path.join('D:', os.sep, 'videos', 'sub', 'movie.mp4'),
+            os.path.join('F:', os.sep, 'output'))
+        self.assertEqual(got, os.path.join('D:', os.sep, 'videos', 'sub'))
+
+    def test_sync_disabled_uses_unified_dir(self):
+        self.cfg.sync_dirs = False
+        unified = os.path.join('F:', os.sep, 'output')
+        got = self.converter._determine_output_dir(
+            os.path.join('D:', os.sep, 'videos', 'sub', 'movie.mp4'), unified)
+        self.assertEqual(got, unified)
+
+    def test_sync_enabled_keeps_files_in_their_own_subdirs(self):
+        """递归扫出来的不同子目录，各自输出到各自目录，不会混在一起"""
+        self.cfg.sync_dirs = True
+        a = self.converter._determine_output_dir(
+            os.path.join('D:', os.sep, 'v', 'A', 'x.mp4'), 'F:\\out')
+        b = self.converter._determine_output_dir(
+            os.path.join('D:', os.sep, 'v', 'B', 'y.mp4'), 'F:\\out')
+        self.assertNotEqual(a, b)
+        self.assertEqual(a, os.path.join('D:', os.sep, 'v', 'A'))
+        self.assertEqual(b, os.path.join('D:', os.sep, 'v', 'B'))
+
+    def _skip_probe(self, sync, place_beside_source):
+        """借 process_file 的「已存在则跳过」分支，探测它到底查了哪个目录。
+
+        预置输出文件的位置命中它查的目录时返回 'skip'，否则会继续往下走。
+        """
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__('shutil').rmtree(tmp, ignore_errors=True))
+        sub = os.path.join(tmp, 'src')
+        unified = os.path.join(tmp, 'unified')
+        os.makedirs(sub)
+        os.makedirs(unified)
+        src = os.path.join(sub, 'clip.mp4')
+        Path(src).touch()
+        target = sub if place_beside_source else unified
+        Path(os.path.join(target, 'clip(HEVC).mp4')).touch()
+
+        self.cfg.sync_dirs = sync
+        self.cfg.out_fmt = '保持原格式'
+        self.converter.get_video_encoder = lambda *a, **k: 'h264'
+        return self.converter.process_file(src, unified, tmp)
+
+    def test_process_file_consults_source_dir_when_synced(self):
+        """sync 开启：预置在源目录旁的输出被认出来 -> 说明查的是源目录"""
+        self.assertEqual(self._skip_probe(sync=True, place_beside_source=True), 'skip')
+
+    def test_process_file_ignores_unified_dir_when_synced(self):
+        """sync 开启：预置在统一目录的输出不该被认出来"""
+        self.assertNotEqual(self._skip_probe(sync=True, place_beside_source=False), 'skip')
+
+    def test_process_file_consults_unified_dir_when_not_synced(self):
+        """sync 关闭：仍然查统一输出目录"""
+        self.assertEqual(self._skip_probe(sync=False, place_beside_source=False), 'skip')
+
+    def _force_probe(self, sync):
+        """截获 process_file_force 传给 encode 的输出路径，看它落在哪个目录"""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__('shutil').rmtree(tmp, ignore_errors=True))
+        sub = os.path.join(tmp, 'src')
+        unified = os.path.join(tmp, 'unified')
+        os.makedirs(sub)
+        os.makedirs(unified)
+        src = os.path.join(sub, 'clip.mp4')
+        Path(src).touch()
+
+        self.cfg.sync_dirs = sync
+        self.cfg.out_fmt = '保持原格式'
+        seen = []
+        self.converter.probe_color_metadata = lambda *a, **k: {}
+        self.converter.detect_color_info = lambda *a, **k: []
+        self.converter.encode = lambda _in, out, _crf: seen.append(out) or False
+        self.converter.process_file_force(src, unified, tmp)
+        self.assertTrue(seen, "encode 未被调用，探针无效")
+        return os.path.dirname(seen[0]), sub, unified
+
+    def test_process_file_force_writes_to_source_dir_when_synced(self):
+        got, sub, _unified = self._force_probe(sync=True)
+        self.assertEqual(got, sub)
+
+    def test_process_file_force_writes_to_unified_dir_when_not_synced(self):
+        got, _sub, unified = self._force_probe(sync=False)
+        self.assertEqual(got, unified)
+
+    def test_process_file_writes_next_to_source_when_synced(self):
+        """端到端：sync 开启时输出文件落在源文件旁边"""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__('shutil').rmtree(tmp, ignore_errors=True))
+        sub = os.path.join(tmp, 'deep')
+        os.makedirs(sub)
+        src = os.path.join(sub, 'clip.mp4')
+        Path(src).touch()
+        self.cfg.sync_dirs = True
+        self.assertEqual(self.converter._determine_output_dir(src, os.path.join(tmp, 'out')), sub)
+
+
 class TestFileCollection(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
