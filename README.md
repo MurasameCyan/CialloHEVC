@@ -56,14 +56,6 @@ python -m venv .venv
 
 测试全部使用替身，不调用真实 ffmpeg，也不访问网络。少数用例需要真实窗口布局才能量出控件坐标，检测到 `CI=true` 时自动跳过。
 
-## 自动构建发布
-
-推送到 `main` 会触发 GitHub Actions：跑测试 → 打包 exe → 按源码里的 `APP_VERSION` 建 `v<版本号>` 的 Release 并上传 `CialloHEVC.exe`。
-
-- 只改 `.md` 不会触发构建
-- 版本号没变时不会重复发布，只在日志里留一条警告；改了源码记得递增 `APP_VERSION`
-- CI 上的测试不拦发布（runner 环境跑不了窗口相关的断言），真正的门禁是本地那条 unittest
-
 
 ## 说明
 
