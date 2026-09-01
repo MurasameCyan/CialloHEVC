@@ -398,8 +398,9 @@ class Config:
         self.encoder = 'CPU'  # 编码器类型：CPU / GPU/N / GPU/A / GPU/I
         self.ffmpeg_path = 'ffmpeg.exe'
         self.theme = 'dark'  # 默认暗色主题
-        self.input_dir = ''  # 输入目录
+        self.input_paths = []  # 输入路径列表（目录）
         self.output_dir = ''  # 输出目录
+        self.recursive_subdirs = False  # 是否递归扫描子目录
         self.proxy_url = 'https://gh-proxy.com'  # 反代地址
         self.gen_ssim_log = True   # 是否生成 SSIM 日志文件（运行目录/log）
         self.gen_summary_log = True  # 是否生成转换汇总日志文件（输出目录）
@@ -413,6 +414,10 @@ class Config:
             try:
                 with open(cfg, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                    # 迁移旧 input_dir 为单元素列表
+                    if 'input_dir' in data and data['input_dir']:
+                        data['input_paths'] = [data['input_dir']]
+                        del data['input_dir']
                     for k, v in data.items():
                         if hasattr(self, k):
                             setattr(self, k, v)
@@ -422,7 +427,9 @@ class Config:
         try:
             cfg = self._config_path()
             with open(cfg, 'w', encoding='utf-8') as f:
-                json.dump({k: v for k, v in self.__dict__.items()}, f, indent=2, ensure_ascii=False)
+                # 排除内部方法，只保存配置字段
+                data = {k: v for k, v in self.__dict__.items() if not k.startswith('_') and not callable(v)}
+                json.dump(data, f, indent=2, ensure_ascii=False)
         except: pass
 
 
